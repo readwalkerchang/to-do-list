@@ -1,19 +1,70 @@
 // 1. 載入 Node.js 內建的 http 模組。
 //    關鍵字提示：
 //    const、http、require、'http'
+const { v4: uuidv4 } = require('uuid');
 const http = require('http');
-// 2. 建立 requestListener 函式。
-//    這個函式會處理瀏覽器送來的 request，並回傳 response。
-//    函式格式提示：
-//    const requestListener = (req, res) => {
-//        這裡放第 3、4、5 步
-//    };
+const todos = [
+    {
+        "title":"今天要寫email",
+        "id": uuidv4()
+    }
+];
+
 const requestListener = (req, res) => {
     console.log(req.url);
     console.log(req.method);
-    res.writeHead(200, {"Content-Type":"text/plain"});
-    res.write('Hello World');
-    res.end();
+    const headers = {
+        'Access-Control-Allow-Headers': 'Content-Type, Authorization, Content-Length, X-Requested-With',
+        'Access-Control-Allow-Origin': '*',
+        'Access-Control-Allow-Methods': 'PATCH, POST, GET,OPTIONS,DELETE',
+        'Content-Type': 'application/json'
+    }
+    let body = "";  
+    req.on('data',(chunk)=>{
+        body += chunk;
+    });
+
+    if(req.url === '/todo' && req.method === 'GET'){
+        res.writeHead(200,headers);
+        res.write(JSON.stringify({
+            "status":"success",
+            "data":todos,
+        }));
+        res.end();
+    }
+    else if(req.url === '/todo' && req.method === 'POST'){
+        req.on('end',()=>{
+            const data = JSON.parse(body);
+            const todo = {
+                "title":data.title,
+                "id":uuidv4()
+            };
+            todos.push(todo);
+            res.writeHead(200,headers);
+            res.write(JSON.stringify({
+                "status":"success",
+                "data":todos,
+            }));
+            res.end();             
+        })
+        
+        
+
+    }
+    else if(req.method === 'OPTIONS'){
+        res.writeHead(200,headers);
+        res.end()
+    }
+    else{
+        res.writeHead(404, headers);
+        res.write(JSON.stringify({
+            "status":"false",
+            "data":{url:req.url,method:req.method},
+            "message":"找不到頁面"
+        }));
+        res.end();
+    }
+
 }
 
 const server = http.createServer(requestListener);
