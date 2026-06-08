@@ -1,14 +1,10 @@
 // 1. 載入 Node.js 內建的 http 模組。
 //    關鍵字提示：
 //    const、http、require、'http'
-const { v4: uuidv4 } = require('uuid');
 const http = require('http');
-const todos = [
-    {
-        "title":"今天要寫email",
-        "id": uuidv4()
-    }
-];
+const { v4: uuidv4 } = require('uuid');
+const errorHandle = require('./errorHandle');
+const todos = [];
 
 const requestListener = (req, res) => {
     console.log(req.url);
@@ -34,22 +30,39 @@ const requestListener = (req, res) => {
     }
     else if(req.url === '/todo' && req.method === 'POST'){
         req.on('end',()=>{
-            const data = JSON.parse(body);
-            const todo = {
-                "title":data.title,
-                "id":uuidv4()
-            };
-            todos.push(todo);
-            res.writeHead(200,headers);
-            res.write(JSON.stringify({
-                "status":"success",
-                "data":todos,
-            }));
-            res.end();             
+            try{
+                const data = JSON.parse(body);
+                if(data.title !== undefined){
+                    const todo = {
+                        "title":data.title,
+                        "id":uuidv4()
+                    };
+                    todos.push(todo);
+                    res.writeHead(200,headers);
+                    res.write(JSON.stringify({
+                        "status":"success",
+                        "data":todos,
+                    }));
+                    res.end();   
+                }
+                else{
+                    errorHandle(res);
+                }
+            }
+            catch(er){
+                errorHandle(res);
+            }
+          
         })
-        
-        
-
+    }
+    else if(req.url === '/todo' && req.method === 'DELETE'){
+        res.writeHead(200,headers);
+        todos.length = 0;
+        res.write(JSON.stringify({
+            "status":"success",
+            "data":todos,
+        }));
+        res.end();
     }
     else if(req.method === 'OPTIONS'){
         res.writeHead(200,headers);
