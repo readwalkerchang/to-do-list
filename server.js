@@ -64,6 +64,24 @@ const requestListener = (req, res) => {
         }));
         res.end();
     }
+    else if(req.url.startsWith('/todo/')  && req.method === 'DELETE'){
+        const id = req.url.split('/').pop();
+        const index = todos.findIndex(elem => elem.id === id);
+        console.log(index)
+        if(index !== -1){
+            todos.splice(index,1);
+            res.writeHead(200,headers);
+            res.write(JSON.stringify({
+                "status":"success",
+                "data":todos,
+            }));
+            res.end();
+        }
+        else{
+            errorHandle(res);
+        }
+
+    }
     else if(req.method === 'OPTIONS'){
         res.writeHead(200,headers);
         res.end()
