@@ -80,6 +80,31 @@ const requestListener = (req, res) => {
         else{
             errorHandle(res);
         }
+    }
+    else if(req.url.startsWith('/todo/')  && req.method === 'PATCH'){
+        req.on('end', () =>{
+            try{
+                const todoTitle = JSON.parse(body).title;
+                const id = req.url.split('/').pop();
+                const index = todos.findIndex(elem => elem.id === id);
+                console.log(index)
+                if(index !== -1 && todoTitle !== undefined){
+                    todos[index].title = todoTitle;
+                    res.writeHead(200,headers);
+                    res.write(JSON.stringify({
+                        "status":"success",
+                        "data":todos,
+                    }));
+                    res.end();
+                }
+                else{
+                    errorHandle(res);
+                }
+            }
+            catch{
+                errorHandle(res);
+            }
+        })
 
     }
     else if(req.method === 'OPTIONS'){
