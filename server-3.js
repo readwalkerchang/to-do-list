@@ -1,56 +1,52 @@
-// Todo API 重寫練習：精簡版提示
+// Todo API 重寫練習：精簡版
+// 對齊 server.js：headers、readBody、sendJson、async requestListener。
 
 // 1. 載入 http、uuidv4、errorHandle。
 
 // 2. 建立 todos 空陣列。
 
-// 3. 建立 requestListener(req, res)。
+// 3. 建立共用 headers。
 
-// 4. 在 requestListener 裡：
-//    - 印出 req.url、req.method
-//    - 建立 headers
-//    - 建立 body 空字串
-//    - 用 req.on('data') 收 body
+// 4. 建立 readBody(req)。
+//    用 Promise 包住 req.on('data')、req.on('end')、req.on('error')。
+//    最後 resolve 完整 body 字串。
 
-// 5. GET /todo
-//    回傳 todos。
+// 5. 建立 sendJson(res, statusCode, payload)。
+//    統一 writeHead，並 end JSON 字串。
 
-// 6. POST /todo
-//    - 用 req.on('end') 等 body 收完
-//    - try 裡 JSON.parse(body)
-//    - 檢查 title 是否存在
-//    - 建立 { title, id }
-//    - todos.push(...)
-//    - 回傳 todos
-//    - 錯誤時呼叫 errorHandle(res)
+// 6. 建立 async requestListener(req, res)。
+//    印出 req.url 和 req.method。
 
-// 7. DELETE /todo
-//    清空 todos，回傳 todos。
+// 7. GET /todo
+//    sendJson 200，回傳 { status: success, data: todos }，然後 return。
 
-// 8. DELETE /todo/:id
-//    - 用 req.url 取出 id
-//    - 用 findIndex 找位置
-//    - 找到：splice(index, 1)，回傳 todos
-//    - 找不到：errorHandle(res)
+// 8. POST /todo
+//    try 裡 await readBody、JSON.parse。
+//    title 必須是非空字串。
+//    合法就 push { title, id }。
+//    成功回傳 todos；錯誤呼叫 errorHandle(res) 並 return。
 
-// 9. PATCH /todo/:id
-//    - 用 req.on('end') 等 body 收完
-//    - try 裡取出 title 和 id
-//    - 用 findIndex 找位置
-//    - 找到且 title 存在：更新 title，回傳 todos
-//    - 否則：errorHandle(res)
+// 9. DELETE /todo
+//    清空 todos，回傳 todos，然後 return。
 
-// 10. OPTIONS
-//     回傳 200 和 headers。
+// 10. DELETE /todo/:id
+//     用 startsWith('/todo/') 判斷。
+//     取 id，findIndex。
+//     找不到就 errorHandle。
+//     找到就 splice(index, 1)，回傳 todos。
 
-// 11. 其他路徑
-//     回傳 404 JSON。
+// 11. PATCH /todo/:id
+//     try 裡 await readBody、JSON.parse 取 title。
+//     取 id，findIndex。
+//     index 找不到或 title 不是非空字串，就 errorHandle。
+//     合法就更新 todos[index].title，回傳 todos。
 
-// 12. 建立 server，監聽 3000。
+// 12. OPTIONS
+//     sendJson 200，回傳 { status: success }，然後 return。
 
-// 測試順序：
-// GET /todo
-// POST /todo
-// PATCH /todo/:id
-// DELETE /todo/:id
-// DELETE /todo
+// 13. 404
+//     sendJson 404，回傳 status、req.url、req.method、message。
+
+// 14. createServer(requestListener)，listen(3000)。
+
+// 測試：GET -> POST -> GET -> PATCH -> DELETE /todo/:id -> DELETE /todo。

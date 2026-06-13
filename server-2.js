@@ -1,149 +1,180 @@
 // 練習目標：
-// 重新寫一次 Todo API server。
+// 重新寫一次 server.js 的 Todo API。
 // 這份檔案只放提示，不放完整程式碼。
-// 請你照著註解一步一步把程式補上。
+// 寫法要對齊目前 server.js：使用 headers、readBody、sendJson、async requestListener。
 
 // 1. 載入需要的模組。
-//    需要用到：
-//    - Node.js 內建的 http 模組
-//    - uuid 套件裡面的 v4 方法，並把它改名成 uuidv4
-//    - 你自己寫好的 errorHandle
+//    需要載入：
+//    - Node.js 內建 http 模組
+//    - uuid 套件的 v4，並重新命名成 uuidv4
+//    - 本地的 errorHandle
+const http = require('http');
+const { v4: uuidv4 } = require('uuid');
+const errorHandle = require('./errorHandle');
 
 // 2. 建立 todos 陣列。
-//    這個陣列用來暫時存放所有 todo。
-//    一開始可以是空陣列。
+//    這個陣列用來暫存 todo 資料。
+//    一開始是空陣列。
+const todos = [];
 
-// 3. 建立 requestListener 函式。
-//    這個函式需要兩個參數：
-//    - req：使用者送進來的 request
-//    - res：server 要回傳出去的 response
-
-// 4. 在 requestListener 裡面，先印出 request 資訊。
-//    可以印：
-//    - req.url
-//    - req.method
-//    這樣你在 terminal 可以看到 Postman 打了哪個 API。
-
-// 5. 在 requestListener 裡面，建立 headers 物件。
-//    headers 裡面需要設定：
+// 3. 建立 headers 常數。
+//    這個 headers 放在 requestListener 外面，因為每個 API 都會共用。
+//    需要包含：
 //    - Access-Control-Allow-Headers
 //    - Access-Control-Allow-Origin
 //    - Access-Control-Allow-Methods
 //    - Content-Type: application/json
+const headers = {
+  'Access-Control-Allow-Headers': 'Content-Type, Authorization, Content-Length, X-Requested-With',
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Methods': 'PATCH, POST, GET, OPTIONS, DELETE',
+  'Content-Type': 'application/json',
+};
 
-// 6. 在 requestListener 裡面，準備接收 request body。
-//    建立一個空字串 body。
-//    使用 req.on('data', ...) 接收 chunk。
-//    每收到一段 chunk，就把它加到 body 後面。
+// 4. 建立 readBody(req) helper。
+//    這個 helper 的目標：把 request body 讀完，最後回傳完整 body 字串。
+//    寫法方向：
+//    - 回傳一個 Promise
+//    - 在 Promise 裡建立 body 空字串
+//    - 設定 req.setEncoding('utf8')
+//    - 用 req.on('data') 把 chunk 加到 body
+//    - 用 req.on('end') resolve(body)
+//    - 用 req.on('error') reject(error)
+const readBody = (req) => new Promise((resolve, reject) => {
+    let body = '';
+    req.setEncoding('utf8');
+    req.on('data', (chunk) => {
+        body += chunk;
+    });
+    req.on('end',() => resolve(body));
+    req.on('error',reject);
+});
+
+
+// 5. 建立 sendJson(res, statusCode, payload) helper。
+//    這個 helper 的目標：統一回傳 JSON。
+//    寫法方向：
+//    - 使用 res.writeHead(statusCode, headers)
+//    - 使用 res.end(...)
+//    - payload 要先轉成 JSON 字串
+const sendJson = (res, statusCode, payload) => {
+    res.writeHead(statusCode, headers);
+    res.end(JSON.stringify(payload));
+};
+
+// 6. 建立 async requestListener(req, res)。
+//    注意：這裡要加 async，因為 POST 和 PATCH 會 await readBody(req)。
+//    一開始可以先印出：
+//    - req.url
+//    - req.method
+const  requestListener = async (req, res) => {
+ console.log(req.url);
+ console.log(req.method);
+
 
 // 7. 寫 GET /todo。
 //    條件：
 //    - req.url 等於 /todo
 //    - req.method 等於 GET
-//    要做的事：
-//    - 回傳 200
-//    - 回傳 JSON
-//    - JSON 裡面包含 status: success
-//    - JSON 裡面包含 data: todos
-//    - 最後要結束 response
+//    行為：
+//    - 使用 sendJson 回傳 200
+//    - payload 包含 status: success
+//    - payload 包含 data: todos
+//    - 回傳後要 return，避免繼續往下跑
 
 // 8. 寫 POST /todo。
 //    條件：
 //    - req.url 等於 /todo
 //    - req.method 等於 POST
-//    要注意：
-//    - POST 需要等 body 全部接收完，所以邏輯要放在 req.on('end', ...) 裡。
-//    - JSON.parse(body) 要放在 try 裡，避免 JSON 格式錯誤時 server crash。
-//    要做的事：
-//    - 從 body 取出 title
-//    - 檢查 title 不是 undefined
-//    - 建立一個新的 todo 物件
-//    - todo 物件需要 title 和 id
-//    - id 使用 uuidv4 產生
-//    - 把新的 todo 放進 todos 陣列
-//    - 回傳 status: success 和 data: todos
-//    - 如果 title 不存在，呼叫 errorHandle(res)
-//    - 如果 JSON.parse 出錯，呼叫 errorHandle(res)
+//    行為：
+//    - 放在 try/catch 裡
+//    - await readBody(req) 取得 body 字串
+//    - JSON.parse(body) 轉成 data
+//    - 檢查 data.title 必須是字串
+//    - 檢查 data.title.trim() 不能是空字串
+//    - 不合法時呼叫 errorHandle(res)，然後 return
+//    - 合法時新增 todo：title 使用 data.title，id 使用 uuidv4()
+//    - 把新 todo push 到 todos
+//    - 使用 sendJson 回傳 200、status: success、data: todos
+//    - catch 裡呼叫 errorHandle(res)，然後 return
 
 // 9. 寫 DELETE /todo。
 //    這個 API 是刪除全部 todos。
 //    條件：
 //    - req.url 等於 /todo
 //    - req.method 等於 DELETE
-//    要做的事：
-//    - 清空 todos 陣列
-//    - 回傳 status: success 和 data: todos
-//    提醒：
-//    - 如果 todos 是 const 宣告，不要用 todos = []
-//    - 可以改變陣列長度來清空原本的陣列
+//    行為：
+//    - 清空原本的 todos 陣列
+//    - 如果 todos 是 const，不要寫 todos = []
+//    - 使用 sendJson 回傳 200、status: success、data: todos
+//    - 回傳後 return
 
 // 10. 寫 DELETE /todo/:id。
 //     這個 API 是刪除單一 todo。
 //     條件：
-//     - req.url 是以 /todo/ 開頭
+//     - req.url 以 /todo/ 開頭
 //     - req.method 等於 DELETE
-//     要做的事：
-//     - 從 req.url 取出最後面的 id
-//     - 用 findIndex 找出 todos 裡 id 相同的那一筆位置
-//     - 如果 index 不是 -1，代表有找到
-//     - 找到時，用 splice 刪除那一筆
-//     - 回傳 status: success 和 data: todos
-//     - 找不到時，呼叫 errorHandle(res)
-//     提醒：
-//     - 這裡不能清空整個 todos
-//     - 刪除單筆時，只刪 index 那一筆
+//     行為：
+//     - 從 req.url 最後一段取出 id
+//     - 用 findIndex 找 todos 裡 id 相同的項目
+//     - 如果 index 是 -1，呼叫 errorHandle(res)，然後 return
+//     - 如果有找到，用 splice(index, 1) 刪除單筆
+//     - 使用 sendJson 回傳 200、status: success、data: todos
+//     - 回傳後 return
 
 // 11. 寫 PATCH /todo/:id。
 //     這個 API 是修改單一 todo 的 title。
 //     條件：
-//     - req.url 是以 /todo/ 開頭
+//     - req.url 以 /todo/ 開頭
 //     - req.method 等於 PATCH
-//     要注意：
-//     - PATCH 也需要讀 body，所以邏輯要放在 req.on('end', ...) 裡。
-//     - JSON.parse(body) 要放在 try 裡。
-//     要做的事：
-//     - 從 body 取出新的 title
-//     - 從 req.url 取出 id
-//     - 用 findIndex 找出 todos 裡 id 相同的那一筆位置
-//     - 如果 index 不是 -1，而且 title 不是 undefined，就更新那一筆 todo 的 title
-//     - 回傳 status: success 和 data: todos
-//     - 找不到 id 或 title 不存在時，呼叫 errorHandle(res)
-//     - JSON 格式錯誤時，呼叫 errorHandle(res)
+//     行為：
+//     - 放在 try/catch 裡
+//     - await readBody(req) 取得 body
+//     - JSON.parse(body) 並取出 title
+//     - 從 req.url 最後一段取出 id
+//     - 用 findIndex 找 todos 裡 id 相同的項目
+//     - 如果找不到，呼叫 errorHandle(res)，然後 return
+//     - 如果 title 不是字串，呼叫 errorHandle(res)，然後 return
+//     - 如果 title.trim() 是空字串，呼叫 errorHandle(res)，然後 return
+//     - 合法時更新 todos[index].title
+//     - 使用 sendJson 回傳 200、status: success、data: todos
+//     - catch 裡呼叫 errorHandle(res)，然後 return
 
 // 12. 寫 OPTIONS。
 //     條件：
 //     - req.method 等於 OPTIONS
-//     要做的事：
-//     - 回傳 200
-//     - 帶上 headers
-//     - 結束 response
+//     行為：
+//     - 使用 sendJson 回傳 200
+//     - payload 可以只放 status: success
+//     - 回傳後 return
 
 // 13. 寫 404。
-//     如果前面的 route 都沒有符合，就走到這裡。
-//     要做的事：
-//     - 回傳 404
-//     - 回傳 JSON
-//     - JSON 裡面可以包含：
-//       - status: false
-//       - data: 目前的 req.url 和 req.method
-//       - message: 找不到頁面
-//     - 最後結束 response
-
+//     如果前面所有條件都沒有符合，就走到這裡。
+//     行為：
+//     - 使用 sendJson 回傳 404
+//     - payload 包含 status: false
+//     - payload 包含 data: req.url 和 req.method
+//     - payload 包含 message: 找不到頁面
+}
 // 14. 建立 server。
-//     使用 http 模組建立 server。
+//     使用 http.createServer(...)
 //     把 requestListener 傳進去。
+const server = http.createServer(requestListener)
 
 // 15. 啟動 server。
-//     監聽 port 3000。
-//     寫完後，在 terminal 執行：
-//     node server-2.js
+//     監聽 3000。
+//     可以加 callback，在 terminal 印出 server 已啟動。
+server.listen(3000, ()=> {
+    console.log(('Server running on port 3000'))
+})
 
-// 16. 建議測試順序：
-//     - GET /todo：確認一開始可以拿到 todos
-//     - POST /todo：新增一筆 todo
-//     - GET /todo：確認新增成功
-//     - PATCH /todo/:id：修改剛剛新增的 todo
-//     - DELETE /todo/:id：刪除剛剛新增的 todo
-//     - DELETE /todo：清空全部 todos
-//     - 測試錯誤 id：確認會走 errorHandle
-//     - 測試錯誤路徑：確認會走 404
+// 測試順序：
+// 1. GET /todo
+// 2. POST /todo
+// 3. GET /todo
+// 4. PATCH /todo/:id
+// 5. DELETE /todo/:id
+// 6. DELETE /todo
+// 7. 測試錯誤 id
+// 8. 測試錯誤 JSON
+// 9. 測試不存在的路徑
