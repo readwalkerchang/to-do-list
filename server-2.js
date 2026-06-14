@@ -67,7 +67,7 @@ const sendJson = (res, statusCode, payload) => {
 //    一開始可以先印出：
 //    - req.url
 //    - req.method
-const  requestListener = async (req, res) => {
+const requestListener = async (req, res) => {
  console.log(req.url);
  console.log(req.method);
 
@@ -81,6 +81,13 @@ const  requestListener = async (req, res) => {
 //    - payload 包含 status: success
 //    - payload 包含 data: todos
 //    - 回傳後要 return，避免繼續往下跑
+if(req.url === '/todo' && req.method === 'GET'){
+    sendJson(res, 200, {
+        "status":"success",
+        "data":todos
+    })
+    return;
+}
 
 // 8. 寫 POST /todo。
 //    條件：
@@ -97,6 +104,32 @@ const  requestListener = async (req, res) => {
 //    - 把新 todo push 到 todos
 //    - 使用 sendJson 回傳 200、status: success、data: todos
 //    - catch 裡呼叫 errorHandle(res)，然後 return
+if(req.url === '/todo' && req.method === 'POST'){
+    try{
+        const body = await readBody(req);
+        const data = JSON.parse(body);
+        if(typeof(data.title)==='string' && data.title.trim() !== ''){
+            const todo = {
+                "title":data.title,
+                "id":uuidv4()
+            }
+            todos.push(todo);
+            sendJson(res, 200, {
+                "status": "success",
+                "data": todos
+            })
+            return
+        }
+        else{
+            errorHandle(res);
+            return
+        }
+    }
+    catch{
+        errorHandle(res);
+        return
+    }
+}
 
 // 9. 寫 DELETE /todo。
 //    這個 API 是刪除全部 todos。
@@ -108,6 +141,14 @@ const  requestListener = async (req, res) => {
 //    - 如果 todos 是 const，不要寫 todos = []
 //    - 使用 sendJson 回傳 200、status: success、data: todos
 //    - 回傳後 return
+if(req.url === '/todo' && req.method === 'DELETE'){
+    todos.length = 0;
+    sendJson(res, 200, {
+        "status":"success",
+        "data":todos
+    })
+    return;
+}
 
 // 10. 寫 DELETE /todo/:id。
 //     這個 API 是刪除單一 todo。
@@ -121,6 +162,22 @@ const  requestListener = async (req, res) => {
 //     - 如果有找到，用 splice(index, 1) 刪除單筆
 //     - 使用 sendJson 回傳 200、status: success、data: todos
 //     - 回傳後 return
+  if(req.url.startsWith('/todo/') && req.method === 'DELETE'){
+    const id = req.url.split('/').pop();
+    const index = todos.findIndex((elem) => elem.id === id);
+    if(index !== -1){
+        todos.splice(index,1);
+        sendJson(res, 200, {
+            "status":"success",
+            "data":todos
+        })
+        return
+    }
+    else{
+        errorHandle(res);
+        return
+    }
+  }
 
 // 11. 寫 PATCH /todo/:id。
 //     這個 API 是修改單一 todo 的 title。
@@ -139,6 +196,31 @@ const  requestListener = async (req, res) => {
 //     - 合法時更新 todos[index].title
 //     - 使用 sendJson 回傳 200、status: success、data: todos
 //     - catch 裡呼叫 errorHandle(res)，然後 return
+  if(req.url.startsWith('/todo/') && req.method === 'PATCH'){
+    try{
+        const body = await readBody(req);
+        const data = JSON.parse(body);
+        const id = req.url.split('/').pop();
+        const index = todos.findIndex((elem) => elem.id === id);
+        if(index !== -1 && typeof(data.title)==='string' 
+        && data.title.trim() !== ''){
+            todos[index].title = data.title;
+            sendJson(res, 200, {
+                "status":"success",
+                "data":todos
+            });
+            return;
+        }
+        else{
+            errorHandle(res);
+            return;
+        }
+    }
+    catch{
+        errorHandle(res);
+        return;
+    }
+  }
 
 // 12. 寫 OPTIONS。
 //     條件：
@@ -147,6 +229,12 @@ const  requestListener = async (req, res) => {
 //     - 使用 sendJson 回傳 200
 //     - payload 可以只放 status: success
 //     - 回傳後 return
+  if(req.method === 'OPTIONS'){
+    sendJson(res, 200, {
+        "status":"success",
+    })
+    return;
+  }
 
 // 13. 寫 404。
 //     如果前面所有條件都沒有符合，就走到這裡。
@@ -155,6 +243,12 @@ const  requestListener = async (req, res) => {
 //     - payload 包含 status: false
 //     - payload 包含 data: req.url 和 req.method
 //     - payload 包含 message: 找不到頁面
+
+    sendJson(res, 404,{
+        "status": "false",
+        "data":  { url: req.url, method: req.method },
+        "message": "找不到頁面"
+    })
 }
 // 14. 建立 server。
 //     使用 http.createServer(...)
